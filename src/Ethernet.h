@@ -36,7 +36,7 @@
 #if defined(RAMEND) && defined(RAMSTART) && ((RAMEND - RAMSTART) <= 2048)
 #define MAX_SOCK_NUM 4
 #else
-#define MAX_SOCK_NUM 8
+#define MAX_SOCK_NUM 4
 #endif
 
 // By default, each socket uses 2K buffers inside the Wiznet chip.  If
@@ -45,7 +45,7 @@
 // can really help with UDP protocols like Artnet.  In theory larger
 // buffers should allow faster TCP over high-latency links, but this
 // does not always seem to work in practice (maybe Wiznet bugs?)
-//#define ETHERNET_LARGE_BUFFERS
+#define ETHERNET_LARGE_BUFFERS
 
 
 #include <Arduino.h>
@@ -58,6 +58,10 @@ enum EthernetLinkStatus {
 	LinkON,
 	LinkOFF
 };
+
+#if (ARDUINO_ARCH_SPRESENSE)
+typedef enum EthernetLinkStatus link;
+#endif
 
 enum EthernetHardwareStatus {
 	EthernetNoHardware,
@@ -237,6 +241,7 @@ public:
 	uint8_t getSocketNumber() const { return sockindex; }
 	virtual uint16_t localPort();
 	virtual IPAddress remoteIP();
+	virtual uint8_t getSockNum();
 	virtual uint16_t remotePort();
 	virtual void setConnectionTimeout(uint16_t timeout) { _timeout = timeout; }
 

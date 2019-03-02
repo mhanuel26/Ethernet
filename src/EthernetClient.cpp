@@ -50,7 +50,7 @@ int EthernetClient::connect(IPAddress ip, uint16_t port)
 #if defined(ESP8266) || defined(ESP32)
 	if (ip == IPAddress((uint32_t)0) || ip == IPAddress(0xFFFFFFFFul)) return 0;
 #else
-	if (ip == IPAddress(0ul) || ip == IPAddress(0xFFFFFFFFul)) return 0;
+	if (ip == IPAddress((uint32_t)0ul) || ip == IPAddress(0xFFFFFFFFul)) return 0;
 #endif
 	sockindex = Ethernet.socketBegin(SnMR::TCP, 0);
 	if (sockindex >= MAX_SOCK_NUM) return 0;
@@ -213,3 +213,7 @@ uint16_t EthernetClient::remotePort()
 }
 
 
+uint8_t EthernetClient::getSockNum(){
+	if (sockindex >= MAX_SOCK_NUM) return 0;
+		return sockindex;
+}

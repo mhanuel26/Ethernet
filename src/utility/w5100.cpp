@@ -43,7 +43,7 @@
 
 // As a final fallback, use pin 10
 #else
-#define SS_PIN_DEFAULT  10
+#define SS_PIN_DEFAULT  8
 #endif
 
 
@@ -110,32 +110,33 @@ uint8_t W5100Class::init(void)
 	// reset its SPI state when CS goes high (inactive).  Communication
 	// from detecting the other chips can leave the W5200 in a state
 	// where it won't recover, unless given a reset pulse.
-	if (isW5200()) {
-		CH_BASE_MSB = 0x40;
-#ifdef ETHERNET_LARGE_BUFFERS
-#if MAX_SOCK_NUM <= 1
-		SSIZE = 16384;
-#elif MAX_SOCK_NUM <= 2
-		SSIZE = 8192;
-#elif MAX_SOCK_NUM <= 4
-		SSIZE = 4096;
-#else
-		SSIZE = 2048;
-#endif
-		SMASK = SSIZE - 1;
-#endif
-		for (i=0; i<MAX_SOCK_NUM; i++) {
-			writeSnRX_SIZE(i, SSIZE >> 10);
-			writeSnTX_SIZE(i, SSIZE >> 10);
-		}
-		for (; i<8; i++) {
-			writeSnRX_SIZE(i, 0);
-			writeSnTX_SIZE(i, 0);
-		}
-	// Try W5500 next.  Wiznet finally seems to have implemented
-	// SPI well with this chip.  It appears to be very resilient,
-	// so try it after the fragile W5200
-	} else if (isW5500()) {
+// 	if (isW5200()) {
+// 		CH_BASE_MSB = 0x40;
+// #ifdef ETHERNET_LARGE_BUFFERS
+// #if MAX_SOCK_NUM <= 1
+// 		SSIZE = 16384;
+// #elif MAX_SOCK_NUM <= 2
+// 		SSIZE = 8192;
+// #elif MAX_SOCK_NUM <= 4
+// 		SSIZE = 4096;
+// #else
+// 		SSIZE = 2048;
+// #endif
+// 		SMASK = SSIZE - 1;
+// #endif
+// 		for (i=0; i<MAX_SOCK_NUM; i++) {
+// 			writeSnRX_SIZE(i, SSIZE >> 10);
+// 			writeSnTX_SIZE(i, SSIZE >> 10);
+// 		}
+// 		for (; i<8; i++) {
+// 			writeSnRX_SIZE(i, 0);
+// 			writeSnTX_SIZE(i, 0);
+// 		}
+// 	// Try W5500 next.  Wiznet finally seems to have implemented
+// 	// SPI well with this chip.  It appears to be very resilient,
+// 	// so try it after the fragile W5200
+// 	} else 
+	if (isW5500()) {
 		CH_BASE_MSB = 0x10;
 #ifdef ETHERNET_LARGE_BUFFERS
 #if MAX_SOCK_NUM <= 1
@@ -162,34 +163,37 @@ uint8_t W5100Class::init(void)
 	// it recovers from "hearing" unsuccessful W5100 or W5200
 	// communication.  W5100 is also the only chip without a VERSIONR
 	// register for identification, so we check this last.
-	} else if (isW5100()) {
-		CH_BASE_MSB = 0x04;
-#ifdef ETHERNET_LARGE_BUFFERS
-#if MAX_SOCK_NUM <= 1
-		SSIZE = 8192;
-		writeTMSR(0x03);
-		writeRMSR(0x03);
-#elif MAX_SOCK_NUM <= 2
-		SSIZE = 4096;
-		writeTMSR(0x0A);
-		writeRMSR(0x0A);
-#else
-		SSIZE = 2048;
-		writeTMSR(0x55);
-		writeRMSR(0x55);
-#endif
-		SMASK = SSIZE - 1;
-#else
-		writeTMSR(0x55);
-		writeRMSR(0x55);
-#endif
-	// No hardware seems to be present.  Or it could be a W5200
-	// that's heard other SPI communication if its chip select
-	// pin wasn't high when a SD card or other SPI chip was used.
-	} else {
+	} 
+// 	else if (isW5100()) {
+// 		CH_BASE_MSB = 0x04;
+// #ifdef ETHERNET_LARGE_BUFFERS
+// #if MAX_SOCK_NUM <= 1
+// 		SSIZE = 8192;
+// 		writeTMSR(0x03);
+// 		writeRMSR(0x03);
+// #elif MAX_SOCK_NUM <= 2
+// 		SSIZE = 4096;
+// 		writeTMSR(0x0A);
+// 		writeRMSR(0x0A);
+// #else
+// 		SSIZE = 2048;
+// 		writeTMSR(0x55);
+// 		writeRMSR(0x55);
+// #endif
+// 		SMASK = SSIZE - 1;
+// #else
+// 		writeTMSR(0x55);
+// 		writeRMSR(0x55);
+// #endif
+// 	// No hardware seems to be present.  Or it could be a W5200
+// 	// that's heard other SPI communication if its chip select
+// 	// pin wasn't high when a SD card or other SPI chip was used.
+// 	} 
+	else {
 		//Serial.println("no chip :-(");
 		chip = 0;
 		SPI.endTransaction();
+
 		return 0; // no known chip is responding :-(
 	}
 	SPI.endTransaction();
@@ -202,14 +206,15 @@ uint8_t W5100Class::softReset(void)
 {
 	uint16_t count=0;
 
-	//Serial.println("Wiznet soft reset");
+	// Serial.println("Wiznet soft reset");
 	// write to reset bit
 	writeMR(0x80);
 	// then wait for soft reset to complete
 	do {
 		uint8_t mr = readMR();
-		//Serial.print("mr=");
-		//Serial.println(mr, HEX);
+		// mr &= 0xBA;		// mask reserved register fields
+		// Serial.print("mr=");
+		// Serial.println(mr, HEX);
 		if (mr == 0) return 1;
 		delay(1);
 	} while (++count < 20);
@@ -255,17 +260,30 @@ uint8_t W5100Class::isW5500(void)
 	chip = 55;
 	//Serial.println("w5100.cpp: detect W5500 chip");
 	if (!softReset()) return 0;
+	delay(1);
 	writeMR(0x08);
-	if (readMR() != 0x08) return 0;
+	if (readMR() != 0x08) {
+		// Serial.println("isW5500 readMR != 0x08");
+		return 0;
+	}
 	writeMR(0x10);
-	if (readMR() != 0x10) return 0;
+	if (readMR() != 0x10) {
+		// Serial.println("isW5500 readMR != 0x10");
+		return 0;
+	}
 	writeMR(0x00);
-	if (readMR() != 0x00) return 0;
+	if (readMR() != 0x00) {
+		// Serial.println("isW5500 readMR != 0x00");
+		return 0;
+	}
 	int ver = readVERSIONR_W5500();
 	//Serial.print("version=");
 	//Serial.println(ver);
-	if (ver != 4) return 0;
-	//Serial.println("chip is W5500");
+	if (ver != 4) {
+		// Serial.println("isW5500 ver != 4");
+		return 0;
+	}
+	// Serial.println("chip is W5500");
 	return 1;
 }
 
@@ -314,7 +332,8 @@ uint16_t W5100Class::write(uint16_t addr, const uint8_t *buf, uint16_t len)
 		cmd[3] = len & 0xFF;
 		SPI.transfer(cmd, 4);
 #ifdef SPI_HAS_TRANSFER_BUF
-		SPI.transfer(buf, NULL, len);
+		SPI.transfer((void *)buf, (size_t)len);
+		// SPI.transfer(buf, NULL, len);
 #else
 		// TODO: copy 8 bytes at a time to cmd[] and block transfer
 		for (uint16_t i=0; i < len; i++) {
@@ -370,7 +389,8 @@ uint16_t W5100Class::write(uint16_t addr, const uint8_t *buf, uint16_t len)
 		} else {
 			SPI.transfer(cmd, 3);
 #ifdef SPI_HAS_TRANSFER_BUF
-			SPI.transfer(buf, NULL, len);
+			SPI.transfer((void *)buf, (size_t)len);
+			// SPI.transfer(buf, NULL, len);
 #else
 			// TODO: copy 8 bytes at a time to cmd[] and block transfer
 			for (uint16_t i=0; i < len; i++) {
